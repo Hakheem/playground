@@ -1,0 +1,170 @@
+name: Auto Daily Commit
+
+on:
+  schedule:
+    # Runs Monday to Saturday at 3:00 AM Nairobi time (UTC+3 = 00:00 UTC)
+    - cron: '0 0 * * 1-6'
+  workflow_dispatch:
+    inputs:
+      reason:
+        description: 'Reason for manual run'
+        required: false
+        default: 'Scheduled auto-commit'
+
+permissions:
+  contents: write
+
+jobs:
+  auto-commit:
+    runs-on: ubuntu-latest
+    
+    steps:
+    - name: Checkout repository
+      uses: actions/checkout@v4
+      with:
+        token: ${{ secrets.GITHUB_TOKEN }}
+        fetch-depth: 0
+    
+    - name: Check for today's commits
+      id: check_today
+      run: |
+        # Get today's date
+        TODAY=$(date +%Y-%m-%d)
+        
+        # Check if there's any commit from today
+        if git log --since="$TODAY 00:00:00" --oneline | grep -q .; then
+          echo "Commit already made today. Skipping auto-commit."
+          echo "skip=true" >> $GITHUB_OUTPUT
+        else
+          echo "No commits today. Proceeding with auto-commit."
+          echo "skip=false" >> $GITHUB_OUTPUT
+        fi
+    
+    - name: Update timestamp and add random thoughts
+      if: steps.check_today.outputs.skip == 'false'
+      run: |
+        # Array of random thoughts
+        thoughts=(
+          "The early bird gets the worm, but the second mouse gets the cheese."
+          "Programming is like writing a book, except if you miss a single comma on page 126, the whole thing makes no sense."
+          "The best time to plant a tree was 20 years ago. The second best time is now."
+          "In a world where you can be anything, be kind."
+          "The only way to do great work is to love what you do."
+          "Simplicity is the ultimate sophistication."
+          "The future belongs to those who believe in the beauty of their dreams."
+          "Every day may not be good, but there is something good in every day."
+          "The mind is everything. What you think you become."
+          "Life is what happens to you while you're busy making other plans."
+          "The journey of a thousand miles begins with one step."
+          "Be the change that you wish to see in the world."
+          "It always seems impossible until it's done."
+          "Don't watch the clock; do what it does. Keep going."
+          "The only limit to our realization of tomorrow will be our doubts of today."
+          "You miss 100% of the shots you don't take."
+          "The purpose of our lives is to be happy."
+          "Stay hungry, stay foolish."
+          "Your time is limited, so don't waste it living someone else's life."
+          "The greatest glory in living lies not in never falling, but in rising every time we fall."
+        )
+        
+        # Select a random thought
+        random_index=$((RANDOM % ${#thoughts[@]}))
+        selected_thought="${thoughts[$random_index]}"
+        
+        # Get current date and time in various formats
+        CURRENT_DATE=$(date '+%Y-%m-%d')
+        CURRENT_TIME=$(date '+%H:%M:%S')
+        CURRENT_DATETIME=$(date '+%Y-%m-%d %H:%M:%S %Z')
+        DAY_OF_WEEK=$(date '+%A')
+        EPOCH_TIME=$(date +%s)
+        
+        # Update the timestamp file
+        cat > timestamp.md << EOF
+# Auto-Commit Timestamp
+        
+## Latest Update
+- **Date:** $CURRENT_DATE
+- **Time:** $CURRENT_TIME (Nairobi: 3:00 AM)
+- **Day:** $DAY_OF_WEEK
+- **Epoch Time:** $EPOCH_TIME
+- **GitHub Run ID:** ${{ github.run_id }}
+- **Run Number:** ${{ github.run_number }}
+        
+## Today's Random Thought
+> "$selected_thought"
+        
+## Previous Updates
+EOF
+        
+        # Add previous entries if the file already exists
+        if [ -f timestamp.md.old ]; then
+          echo "" >> timestamp.md
+          echo "### History" >> timestamp.md
+          echo "" >> timestamp.md
+          echo "| Date | Time | Thought |" >> timestamp.md
+          echo "|------|------|---------|" >> timestamp.md
+          # Add last 5 entries from old file
+          tail -n 10 timestamp.md.old | grep -E "^\|" | head -n 5 >> timestamp.md
+        fi
+        
+        # Save current file as old for next run
+        if [ -f timestamp.md ]; then
+          cp timestamp.md timestamp.md.old
+        fi
+        
+        # Create a JSON version as well
+        cat > auto-commit-data.json << EOF
+{
+  "last_commit": {
+    "date": "$CURRENT_DATE",
+    "time": "$CURRENT_TIME",
+    "datetime": "$CURRENT_DATETIME",
+    "day_of_week": "$DAY_OF_WEEK",
+    "epoch": $EPOCH_TIME,
+    "github_run_id": "${{ github.run_id }}",
+    "github_run_number": ${{ github.run_number }}
+  },
+  "thought": "$selected_thought",
+  "commit_type": "auto",
+  "timezone": "Africa/Nairobi"
+}
+EOF
+        
+        # Also append to a log file
+        echo "$CURRENT_DATETIME | $DAY_OF_WEEK | \"$selected_thought\"" >> auto-commit-history.log
+        
+        echo "Timestamp and thought updated successfully!"
+        echo "Selected thought: $selected_thought"
+    
+    - name: Configure Git
+      if: steps.check_today.outputs.skip == 'false'
+      run: |
+        git config --local user.email "github-actions[bot]@users.noreply.github.com"
+        git config --local user.name "github-actions[bot]"
+        git config --local core.autocrlf false
+    
+    - name: Commit and push changes
+      if: steps.check_today.outputs.skip == 'false'
+      run: |
+        # Add all changed files
+        git add timestamp.md auto-commit-data.json auto-commit-history.log timestamp.md.old 2>/dev/null || true
+        
+        # Check if there are any changes to commit
+        if git diff --staged --quiet; then
+          echo "No changes to commit. Creating empty commit to maintain schedule."
+          git commit --allow-empty -m "chore: auto-commit $(date '+%Y-%m-%d') - No changes detected"
+        else
+          # Commit with descriptive message
+          git commit -m "chore: auto-commit $(date '+%Y-%m-%d %H:%M:%S')
+
+          - Updated timestamp files
+          - Added daily random thought
+          - Nairobi time: 3:00 AM
+          - Run ID: ${{ github.run_id }}"
+        fi
+        
+        # Push changes
+        git push origin HEAD:${{ github.ref_name }}
+        
+        echo "✅ Auto-commit completed successfully!"
+        
