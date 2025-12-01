@@ -78,23 +78,21 @@ jobs:
         DAY_OF_WEEK=$(date '+%A')
         EPOCH_TIME=$(date +%s)
         
-        # Update the timestamp file
-        cat > timestamp.md << EOF
-# Auto-Commit Timestamp
-        
-## Latest Update
-- **Date:** $CURRENT_DATE
-- **Time:** $CURRENT_TIME (Nairobi: 3:00 AM)
-- **Day:** $DAY_OF_WEEK
-- **Epoch Time:** $EPOCH_TIME
-- **GitHub Run ID:** ${{ github.run_id }}
-- **Run Number:** ${{ github.run_number }}
-        
-## Today's Random Thought
-> "$selected_thought"
-        
-## Previous Updates
-EOF
+        # Update the timestamp file - using echo with >> to avoid heredoc issues
+        echo "# Auto-Commit Timestamp" > timestamp.md
+        echo "" >> timestamp.md
+        echo "## Latest Update" >> timestamp.md
+        echo "- **Date:** $CURRENT_DATE" >> timestamp.md
+        echo "- **Time:** $CURRENT_TIME (Nairobi: 3:00 AM)" >> timestamp.md
+        echo "- **Day:** $DAY_OF_WEEK" >> timestamp.md
+        echo "- **Epoch Time:** $EPOCH_TIME" >> timestamp.md
+        echo "- **GitHub Run ID:** ${{ github.run_id }}" >> timestamp.md
+        echo "- **Run Number:** ${{ github.run_number }}" >> timestamp.md
+        echo "" >> timestamp.md
+        echo "## Today's Random Thought" >> timestamp.md
+        echo "> \"$selected_thought\"" >> timestamp.md
+        echo "" >> timestamp.md
+        echo "## Previous Updates" >> timestamp.md
         
         # Add previous entries if the file already exists
         if [ -f timestamp.md.old ]; then
@@ -112,23 +110,21 @@ EOF
           cp timestamp.md timestamp.md.old
         fi
         
-        # Create a JSON version as well
-        cat > auto-commit-data.json << EOF
-{
-  "last_commit": {
-    "date": "$CURRENT_DATE",
-    "time": "$CURRENT_TIME",
-    "datetime": "$CURRENT_DATETIME",
-    "day_of_week": "$DAY_OF_WEEK",
-    "epoch": $EPOCH_TIME,
-    "github_run_id": "${{ github.run_id }}",
-    "github_run_number": ${{ github.run_number }}
-  },
-  "thought": "$selected_thought",
-  "commit_type": "auto",
-  "timezone": "Africa/Nairobi"
-}
-EOF
+        # Create a JSON version as well - using echo
+        echo '{' > auto-commit-data.json
+        echo '  "last_commit": {' >> auto-commit-data.json
+        echo '    "date": "'$CURRENT_DATE'",' >> auto-commit-data.json
+        echo '    "time": "'$CURRENT_TIME'",' >> auto-commit-data.json
+        echo '    "datetime": "'$CURRENT_DATETIME'",' >> auto-commit-data.json
+        echo '    "day_of_week": "'$DAY_OF_WEEK'",' >> auto-commit-data.json
+        echo '    "epoch": '$EPOCH_TIME',' >> auto-commit-data.json
+        echo '    "github_run_id": "'${{ github.run_id }}'",' >> auto-commit-data.json
+        echo '    "github_run_number": '${{ github.run_number }} >> auto-commit-data.json
+        echo '  },' >> auto-commit-data.json
+        echo '  "thought": "'$selected_thought'",' >> auto-commit-data.json
+        echo '  "commit_type": "auto",' >> auto-commit-data.json
+        echo '  "timezone": "Africa/Nairobi"' >> auto-commit-data.json
+        echo '}' >> auto-commit-data.json
         
         # Also append to a log file
         echo "$CURRENT_DATETIME | $DAY_OF_WEEK | \"$selected_thought\"" >> auto-commit-history.log
