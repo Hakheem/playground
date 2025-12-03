@@ -12,7 +12,7 @@ on:
         default: 'Scheduled auto-commit'
 
 permissions:
-  contents: write
+  contents: write # This permission is needed for the PAT to push changes
 
 jobs:
   auto-commit:
@@ -22,7 +22,9 @@ jobs:
     - name: Checkout repository
       uses: actions/checkout@v4
       with:
-        token: ${{ secrets.GITHUB_TOKEN }}
+        # Use your Personal Access Token for authentication
+        # This allows commits to be attributed to your GitHub user
+        token: ${{ secrets.PAT_TOKEN }} 
         fetch-depth: 0
     
     - name: Check for today's commits
@@ -32,6 +34,9 @@ jobs:
         TODAY=$(date +%Y-%m-%d)
         
         # Check if there's any commit from today
+        # Note: This checks local git log. If you pushed other changes manually today,
+        # it might incorrectly skip the auto-commit. For stricter "only this workflow commits once",
+        # you might need to check if the *last commit by this workflow* was today.
         if git log --since="$TODAY 00:00:00" --oneline | grep -q .; then
           echo "Commit already made today. Skipping auto-commit."
           echo "skip=true" >> $GITHUB_OUTPUT
@@ -135,8 +140,9 @@ jobs:
     - name: Configure Git
       if: steps.check_today.outputs.skip == 'false'
       run: |
-        git config --local user.email "github-actions[bot]@users.noreply.github.com"
-        git config --local user.name "github-actions[bot]"
+        # IMPORTANT: These are now set to your specific details
+        git config --local user.email "hectorjohn254@gmail.com" 
+        git config --local user.name "Hakheem"        
         git config --local core.autocrlf false
     
     - name: Commit and push changes
@@ -152,15 +158,14 @@ jobs:
         else
           # Commit with descriptive message
           git commit -m "chore: auto-commit $(date '+%Y-%m-%d %H:%M:%S')
-
+          
           - Updated timestamp files
           - Added daily random thought
           - Nairobi time: 3:00 AM
           - Run ID: ${{ github.run_id }}"
         fi
         
-        # Push changes
+        # Push changes using the PAT for authentication
         git push origin HEAD:${{ github.ref_name }}
         
-        echo "✅ Auto-commit completed successfully!"
-        
+        echo "✅ Auto-commit completed successfully"
