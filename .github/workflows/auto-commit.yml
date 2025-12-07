@@ -2,8 +2,7 @@ name: Auto Daily Commit
 
 on:
   schedule:
-    # Runs Monday to Saturday at 3:00 AM Nairobi time (UTC+3 = 00:00 UTC)
-    - cron: '0 0 * * 1-6'
+    - cron: '0 0 * * *'  
   workflow_dispatch:
     inputs:
       reason:
@@ -34,9 +33,6 @@ jobs:
         TODAY=$(date +%Y-%m-%d)
         
         # Check if there's any commit from today
-        # Note: This checks local git log. If you pushed other changes manually today,
-        # it might incorrectly skip the auto-commit. For stricter "only this workflow commits once",
-        # you might need to check if the *last commit by this workflow* was today.
         if git log --since="$TODAY 00:00:00" --oneline | grep -q .; then
           echo "Commit already made today. Skipping auto-commit."
           echo "skip=true" >> $GITHUB_OUTPUT
@@ -83,7 +79,7 @@ jobs:
         DAY_OF_WEEK=$(date '+%A')
         EPOCH_TIME=$(date +%s)
         
-        # Update the timestamp file - using echo with >> to avoid heredoc issues
+        # Update the timestamp file
         echo "# Auto-Commit Timestamp" > timestamp.md
         echo "" >> timestamp.md
         echo "## Latest Update" >> timestamp.md
@@ -115,7 +111,7 @@ jobs:
           cp timestamp.md timestamp.md.old
         fi
         
-        # Create a JSON version as well - using echo
+        # Create a JSON version
         echo '{' > auto-commit-data.json
         echo '  "last_commit": {' >> auto-commit-data.json
         echo '    "date": "'$CURRENT_DATE'",' >> auto-commit-data.json
@@ -131,7 +127,7 @@ jobs:
         echo '  "timezone": "Africa/Nairobi"' >> auto-commit-data.json
         echo '}' >> auto-commit-data.json
         
-        # Also append to a log file
+        # Append to log file
         echo "$CURRENT_DATETIME | $DAY_OF_WEEK | \"$selected_thought\"" >> auto-commit-history.log
         
         echo "Timestamp and thought updated successfully!"
@@ -140,7 +136,6 @@ jobs:
     - name: Configure Git
       if: steps.check_today.outputs.skip == 'false'
       run: |
-        # IMPORTANT: These are now set to your specific details
         git config --local user.email "hectorjohn254@gmail.com" 
         git config --local user.name "Hakheem"        
         git config --local core.autocrlf false
@@ -151,12 +146,11 @@ jobs:
         # Add all changed files
         git add timestamp.md auto-commit-data.json auto-commit-history.log timestamp.md.old 2>/dev/null || true
         
-        # Check if there are any changes to commit
+        # Check if there are changes to commit
         if git diff --staged --quiet; then
           echo "No changes to commit. Creating empty commit to maintain schedule."
           git commit --allow-empty -m "chore: auto-commit $(date '+%Y-%m-%d') - No changes detected"
         else
-          # Commit with descriptive message
           git commit -m "chore: auto-commit $(date '+%Y-%m-%d %H:%M:%S')
           
           - Updated timestamp files
@@ -165,7 +159,7 @@ jobs:
           - Run ID: ${{ github.run_id }}"
         fi
         
-        # Push changes using the PAT for authentication
+        # Push changes
         git push origin HEAD:${{ github.ref_name }}
         
         echo "✅ Auto-commit completed successfully"
